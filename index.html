@@ -1,0 +1,1064 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Склад бригады</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky header with today's date and day stats, one column of grouped rows, a fixed four-tab bar, and a draft bar that docks above it while stock changes are unsaved. */
+:root{
+  --bg:#EDF0EC;
+  --surface:#FFFFFF;
+  --surface-2:#E2E8E1;
+  --fg:#14201B;
+  --muted:#56635C;
+  --line:#CBD3CA;
+  --accent:#1D5FC4;
+  --on-accent:#FFFFFF;
+  --accent-soft:#DCE7F8;
+  --jacket:#E5B100;
+  --tick:rgba(20,32,27,.30);
+  --ok:#1B7F46;
+  --ok-soft:#DDF1E4;
+  --warn:#9A5200;
+  --warn-soft:#FBE9CF;
+  --bad:#B3261E;
+  --bad-soft:#F8DAD6;
+  --on-bad:#FFFFFF;
+  --apc:#2FA24F;
+  --upc:#2F6FD6;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --navh:62px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1613;--surface:#18221D;--surface-2:#0B100E;--fg:#E6EEE8;--muted:#9AABA1;--line:#2A3830;
+    --accent:#7DADF5;--on-accent:#08162E;--accent-soft:#1B2B47;--tick:rgba(230,238,232,.28);
+    --ok:#5FCB8A;--ok-soft:#12301F;--warn:#F0A24A;--warn-soft:#3A2810;--bad:#F28B82;--bad-soft:#3D1916;--on-bad:#2B0B08;
+    --apc:#4CC575;--upc:#5B97F0;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1613;--surface:#18221D;--surface-2:#0B100E;--fg:#E6EEE8;--muted:#9AABA1;--line:#2A3830;
+  --accent:#7DADF5;--on-accent:#08162E;--accent-soft:#1B2B47;--tick:rgba(230,238,232,.28);
+  --ok:#5FCB8A;--ok-soft:#12301F;--warn:#F0A24A;--warn-soft:#3A2810;--bad:#F28B82;--bad-soft:#3D1916;--on-bad:#2B0B08;
+  --apc:#4CC575;--upc:#5B97F0;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 var(--f-body);padding-block-end:calc(var(--navh) + 190px + env(safe-area-inset-bottom,0px))}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button{font-family:inherit}
+.wrap{max-width:720px;margin-inline:auto;padding-inline:16px}
+
+.hdr{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
+.hdr .top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-block:10px 8px}
+.hl{min-width:0}
+.hr{display:flex;gap:8px;flex:none}
+h1{font:700 24px/1.1 var(--f-display);letter-spacing:.01em;margin:0}
+.today{margin-top:3px;font-size:14px;color:var(--muted)}
+.today b{color:var(--fg);font-weight:600}
+.stat{display:flex;flex-wrap:wrap;gap:0 14px;margin-top:2px;font-size:13px;color:var(--muted)}
+.stat b{color:var(--fg);font-family:var(--f-mono);font-weight:600}
+.hdr #searchbar{padding-block:0 10px}
+.pillbtn{min-height:44px;padding:0 14px;border-radius:22px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 14px var(--f-body);cursor:pointer}
+.pillbtn[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+input,select,textarea{font:16px var(--f-body);min-height:44px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);width:100%;min-width:0}
+textarea{resize:vertical}
+input::placeholder,textarea::placeholder{color:var(--muted);opacity:.8}
+
+main{padding-block:12px}
+.notes{display:grid;gap:8px;margin-bottom:12px}
+.note{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px;font-size:14px}
+.note span{flex:1 1 220px;min-width:0}
+
+.btn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 15px var(--f-body);cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-block:2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;min-height:36px;padding:0 14px;border-radius:18px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 14px var(--f-body);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.toolrow{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:10px}
+.toolrow p{margin:0;font-size:13px;color:var(--muted);flex:1 1 200px}
+
+.group{margin-top:16px}
+.glabel{display:flex;justify-content:space-between;gap:8px;font:600 12px var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 2px 6px}
+.rows{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;align-items:center;padding:10px 12px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row.off{opacity:.55}
+.name{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;padding:0;text-align:left;font:600 16px/1.25 var(--f-body);color:var(--fg);cursor:pointer;overflow-wrap:anywhere}
+.plain{font:600 16px/1.25 var(--f-body);overflow-wrap:anywhere}
+.sw{display:inline-flex;flex:none;gap:3px}
+.sw i{width:13px;height:13px;border-radius:50%;border:1px solid var(--line)}
+.sw i.g{background:var(--apc)}
+.sw i.b{background:var(--upc)}
+.meta{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:center;margin-top:3px;font-size:13px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:10px;font:600 12px var(--f-body)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.mute{background:var(--surface-2);color:var(--muted)}
+.pill.accent{background:var(--accent-soft);color:var(--accent)}
+.step{display:flex;align-items:center;gap:6px}
+.sbtn{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--fg);font:600 24px/1 var(--f-body);cursor:pointer;display:grid;place-items:center;padding:0}
+.sbtn.plus{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.sbtn[disabled]{opacity:.35;cursor:not-allowed}
+.val{min-width:46px;text-align:center;font:600 22px/1 var(--f-mono)}
+.val i{display:block;font:500 12px/1.2 var(--f-mono);font-style:normal;color:var(--accent);margin-top:3px}
+.val.warn{color:var(--warn)}
+.val.bad{color:var(--bad)}
+.qin{width:64px;min-height:44px;padding:4px;text-align:center;font:600 20px var(--f-mono)}
+
+.tophead{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.big{font:600 30px/1 var(--f-mono)}
+.sub{font-size:13px;color:var(--muted);margin-top:4px}
+.reel{display:grid;gap:8px;width:100%;text-align:left;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--fg);font:inherit;cursor:pointer;margin-top:10px}
+.rtop{display:flex;align-items:center;gap:8px}
+.rname{font:700 20px var(--f-display)}
+.rleft{margin-left:auto;text-align:right;display:grid}
+.rleft i{font:400 11px var(--f-body);color:var(--muted);font-style:normal}
+.rleft b{font:600 20px/1.1 var(--f-mono)}
+.rsrc{font-size:13px;color:var(--muted)}
+.cable{position:relative;display:block;height:18px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line);overflow:hidden}
+.cable>span{position:absolute;inset:0 auto 0 0;background:var(--jacket)}
+.cable::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(10% - 1px),var(--tick) calc(10% - 1px),var(--tick) 10%)}
+.rmarks{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 12px;font-size:13px;color:var(--muted)}
+.rmarks b{font-family:var(--f-mono);color:var(--fg);font-weight:600}
+
+.rdate{display:grid;gap:4px;margin-bottom:12px}
+.rdate>span{font-size:13px;color:var(--muted);font-weight:500}
+.pre{margin:12px 0 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);font:500 14px/1.55 var(--f-mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.actions-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.addline{display:flex;gap:8px;margin-top:12px}
+.addline input{flex:1 1 auto}
+.xbtn{flex:none;width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--muted);font-size:20px;cursor:pointer}
+#cf{margin-top:12px;font:14px/1.4 var(--f-mono)}
+
+.empty{padding:28px 8px;text-align:center;color:var(--muted)}
+.empty.small{padding:14px 8px}
+.empty h2{color:var(--fg);font:600 18px var(--f-display);margin:0 0 6px}
+.empty p{margin:0 auto 14px;max-width:34ch}
+
+.dayhead{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;width:100%;text-align:left;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--fg);font:inherit;cursor:pointer;margin-top:8px}
+.dayhead b{font-weight:600}
+.dayhead span.s{grid-column:1;font-size:13px;color:var(--muted)}
+.dayhead .chev{grid-column:2;grid-row:1 / span 2;align-self:center;color:var(--muted);font-size:18px}
+.daybox{margin-top:8px}
+.dtitle{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 2px 2px}
+.dtitle h2{margin:0;font:700 20px var(--f-display)}
+.dtitle span{font-size:13px;color:var(--muted)}
+.jhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:14px 2px 6px;font:600 14px var(--f-body)}
+.jhead em{font-style:normal;color:var(--muted);font-weight:400}
+.jm{font:600 14px var(--f-mono);color:var(--accent);flex:none}
+.lrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:10px 12px;border-top:1px solid var(--line)}
+.lrow:first-child{border-top:0}
+.lm{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.ls{grid-column:1;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.ld{grid-row:1;grid-column:2;font:600 16px var(--f-mono);text-align:right}
+.ld.in{color:var(--ok)}
+
+.draft{position:fixed;left:0;right:0;bottom:calc(var(--navh) + env(safe-area-inset-bottom,0px));z-index:30;background:var(--surface);border-top:2px solid var(--accent);box-shadow:0 -6px 18px rgba(0,0,0,.14)}
+.draft .wrap{padding-block:8px 10px;display:grid;gap:8px}
+.dsum{font:600 14px var(--f-mono)}
+.drow{display:flex;gap:8px;flex-wrap:wrap}
+.drow input{flex:1 1 150px}
+
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.nav .in{max-width:720px;margin-inline:auto;display:grid;grid-template-columns:repeat(4,1fr);height:var(--navh)}
+.tab{position:relative;background:none;border:0;display:grid;place-items:center;align-content:center;gap:2px;color:var(--muted);font:600 12px var(--f-body);cursor:pointer}
+.tab[aria-current="page"]{color:var(--accent)}
+.tab svg,.pillbtn svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.badge{position:absolute;top:6px;left:calc(50% + 8px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--bad);color:var(--on-bad);font:600 11px/18px var(--f-mono);text-align:center}
+.gear{display:grid;place-items:center;width:44px;height:44px;padding:0;border-radius:22px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 96px);z-index:70;max-width:calc(100% - 32px);background:var(--fg);color:var(--bg);padding:10px 14px;border-radius:10px;font-size:14px;font-weight:500;text-align:center}
+
+.scrim{position:fixed;inset:0;z-index:60;background:rgba(8,14,11,.55);display:flex;align-items:flex-end;justify-content:center}
+.panel{width:100%;max-width:560px;max-height:92%;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.sh-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.sh-head h2{font:700 20px/1.2 var(--f-display);margin:0;min-width:0;overflow-wrap:anywhere}
+.x{flex:none;width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--fg);font-size:24px;line-height:1;cursor:pointer}
+.quick{margin-top:12px;padding:12px;border-radius:12px;background:var(--surface-2)}
+.qlbl{font:600 12px var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.qrow{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.qrow input{flex:1 1 90px}
+.quick small{display:block;margin-top:8px}
+.fsec{margin-top:16px}
+.f{display:grid;gap:4px;margin-top:12px}
+.f>span{font-size:13px;color:var(--muted);font-weight:500}
+.f small,.hint{font-size:13px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 10px}
+.actions{display:flex;gap:8px;margin-top:16px}
+.actions .btn{flex:1}
+.wide{width:100%;margin-top:10px}
+.hint{margin:8px 0 0;min-height:20px}
+.hint.err{color:var(--bad)}
+.hint.good{color:var(--ok)}
+.rsum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.rsum div{background:var(--surface-2);border-radius:10px;padding:8px 10px}
+.rsum i{display:block;font:400 12px var(--f-body);color:var(--muted);font-style:normal}
+.rsum b{font:600 18px var(--f-mono)}
+.panel .cable{margin-top:12px}
+.panel .chips{margin-top:12px}
+.pick{display:block;width:100%;text-align:left;min-height:48px;padding:10px 12px;border:0;border-top:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 16px var(--f-body);cursor:pointer}
+.pick:first-child{border-top:0}
+.pick small{color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="wrap top">
+    <div class="hl">
+      <h1 id="h1">Бригада</h1>
+      <div class="today" id="today"></div>
+      <div class="stat" id="stat" aria-live="polite"></div>
+    </div>
+    <div class="hr">
+      <button class="pillbtn" type="button" id="histbtn" data-act="tab" data-v="hist">История</button>
+      <button class="gear" type="button" data-act="settings" aria-label="Настройки"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+    </div>
+  </div>
+  <div class="wrap" id="searchbar" hidden>
+    <input id="q" type="search" placeholder="Найти позицию" autocomplete="off" aria-label="Поиск по позициям">
+  </div>
+</header>
+
+<main class="wrap" id="main"></main>
+<div class="wrap"><textarea id="cf" hidden readonly rows="8" aria-label="Текст для копирования"></textarea></div>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<section id="draft" class="draft" hidden aria-label="Черновик списания">
+  <div class="wrap">
+    <div class="dsum" id="dsum"></div>
+    <div id="djobs"></div>
+    <div class="drow">
+      <input id="dobj" type="text" list="dl-addr" placeholder="Адрес наряда (необязательно)" autocomplete="off" aria-label="Адрес наряда">
+      <button class="btn" type="button" data-act="dreset">Сбросить</button>
+      <button class="btn primary" type="button" data-act="dcommit">Записать</button>
+    </div>
+  </div>
+</section>
+
+<nav class="nav" aria-label="Разделы">
+  <div class="in">
+    <button class="tab" type="button" data-act="tab" data-v="stock"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></svg>Остатки</button>
+    <button class="tab" type="button" data-act="tab" data-v="reels"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>Кабель</button>
+    <button class="tab" type="button" data-act="tab" data-v="req"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5z"/><path d="M14 3v5h5M8 13h8M8 17h6"/></svg>Заявка<span class="badge" id="reqbadge" hidden></span></button>
+    <button class="tab" type="button" data-act="tab" data-v="hist"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>История</button>
+  </div>
+</nav>
+
+<div id="scrim" class="scrim" hidden>
+  <div id="panel" class="panel" role="dialog" aria-modal="true" aria-labelledby="sh-title" tabindex="-1"></div>
+</div>
+
+<datalist id="dl-unit"><option value="шт"><option value="пар"><option value="уп"><option value="м"><option value="рул"><option value="компл"></datalist>
+<datalist id="dl-cat"></datalist>
+<datalist id="dl-addr"></datalist>
+<datalist id="dl-src"></datalist>
+<datalist id="dl-type"></datalist>
+
+<script>
+(function(){
+'use strict';
+
+var KEY='sb2';
+var LOW_M=100;
+var tg=(window.Telegram&&window.Telegram.WebApp)||null;
+var MONTHS=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+var WD=['вс','пн','вт','ср','чт','пт','сб'];
+var TYPES=['Дроп-кабель 1 волокно','Дроп-кабель 2 волокна','Подвесной 8 волокон','Подвесной 16 волокон'];
+
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function num(v){var n=parseFloat(String(v==null?'':v).replace(',','.').replace(/\s/g,''));return isFinite(n)?n:null;}
+function rnd(n){return Math.round(n*100)/100;}
+function fmt(n){return rnd(+n||0).toLocaleString('ru-RU');}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function cmp(a,b){return String(a).localeCompare(String(b),'ru');}
+function val(id){var e=$(id);return e?e.value.trim():'';}
+function plural(n,a,b,c){var m=n%100,k=n%10;if(m>10&&m<20)return c;if(k===1)return a;if(k>=2&&k<=4)return b;return c;}
+
+/* ---------- dates ---------- */
+function pad(n){return (n<10?'0':'')+n;}
+function dkey(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function todayKey(){return dkey(new Date());}
+function parseKey(k){var p=String(k).split('-').map(Number);return new Date(p[0],p[1]-1,p[2]);}
+function validKey(k){return /^\d{4}-\d{2}-\d{2}$/.test(k||'');}
+function longDate(k){
+  var d=parseKey(k),s=WD[d.getDay()]+', '+d.getDate()+' '+MONTHS[d.getMonth()];
+  if(d.getFullYear()!==new Date().getFullYear())s+=' '+d.getFullYear();
+  return s;
+}
+function dayLabel(k){
+  if(k===todayKey())return 'Сегодня';
+  var y=new Date();y.setDate(y.getDate()-1);
+  if(k===dkey(y))return 'Вчера';
+  return longDate(k);
+}
+function ruDate(k){var d=parseKey(k);return d.getDate()+'.'+(d.getMonth()+1)+'.'+d.getFullYear();}
+function shortDate(k){var d=parseKey(k);return d.getDate()+'.'+pad(d.getMonth()+1);}
+
+/* ---------- data ---------- */
+function seed(){
+  var cats=['Муфты','Сплиттеры','Роутеры','ONT','Коннекторы','Оборудование','Расходка'];
+  var rows=[
+    {name:'Муфта 48',unit:'шт',cat:'Муфты'},
+    {name:'Муфта 96',unit:'шт',cat:'Муфты'},
+    {name:'Сплиттер 1/2',unit:'шт',cat:'Сплиттеры'},
+    {name:'Сплиттер 1/4',unit:'шт',cat:'Сплиттеры'},
+    {name:'Сплиттер 1/8',unit:'шт',cat:'Сплиттеры'},
+    {name:'Mercusys AX1500',unit:'шт',cat:'Роутеры',note:'3600'},
+    {name:'Mercusys AX3000',unit:'шт',cat:'Роутеры',note:'5600'},
+    {name:'ONT Huawei',unit:'шт',cat:'ONT'},
+    {name:'Зелёный–зелёный (SC/APC)',unit:'шт',cat:'Коннекторы',sw:['g','g']},
+    {name:'Синий–синий (SC/UPC)',unit:'шт',cat:'Коннекторы',sw:['b','b']},
+    {name:'Синий–зелёный (SC/UPC–APC)',unit:'шт',cat:'Коннекторы',sw:['b','g']},
+    {name:'Медиаконвертер под sfp модуль без sfp',unit:'шт',cat:'Оборудование',norm:2},
+    {name:'sfp модуль 1310 1гб',unit:'шт',cat:'Оборудование',norm:1},
+    {name:'sfp модуль 1550 1гб',unit:'шт',cat:'Оборудование',norm:1},
+    {name:'Перчатки х/б',unit:'пар',cat:'Расходка',norm:15},
+    {name:'Перчатки прорезиненные',unit:'пар',cat:'Расходка',norm:5},
+    {name:'Изолента чёрная',unit:'шт',cat:'Расходка',norm:5},
+    {name:'Изолента белая',unit:'шт',cat:'Расходка',norm:5},
+    {name:'Стяжки 150мм',unit:'уп',cat:'Расходка',norm:1}
+  ];
+  var items={};
+  rows.forEach(function(r,i){
+    var it={name:r.name,unit:r.unit,cat:r.cat,qty:0,norm:r.norm||0,note:r.note||'',o:i+1};
+    if(r.sw)it.sw=r.sw;
+    items['i'+(i+1)]=it;
+  });
+  return {v:1,brigade:'7',job:1,cats:cats,items:items,reels:{},log:[],req:{date:'',adj:{},extra:[]},hint:true};
+}
+function load(){
+  try{
+    var raw=localStorage.getItem(KEY);if(!raw)return null;
+    var o=JSON.parse(raw);
+    if(!o||typeof o!=='object'||!o.items||!o.reels||!Array.isArray(o.log))return null;
+    o.req=o.req||{date:'',adj:{},extra:[]};o.req.adj=o.req.adj||{};o.req.extra=o.req.extra||[];
+    o.cats=o.cats||[];o.job=o.job||1;
+    return o;
+  }catch(e){return null;}
+}
+var D=load()||seed();
+var U={tab:'stock',q:'',cat:'all',draft:{},job:D.job||1,sheet:null,confirm:'',openDay:null,showClosed:false,saveFail:false};
+var toastT=0;
+
+function save(){
+  D.job=U.job;
+  try{localStorage.setItem(KEY,JSON.stringify(D));U.saveFail=false;}
+  catch(e){if(!U.saveFail){U.saveFail=true;toast('Не удалось сохранить в телефоне. Сделайте копию в настройках.');}}
+}
+function itemsArr(){return Object.keys(D.items).map(function(id){return Object.assign({id:id},D.items[id]);}).sort(function(a,b){return (a.o||0)-(b.o||0)||cmp(a.name,b.name);});}
+function reelsArr(){return Object.keys(D.reels).map(function(id){return Object.assign({id:id},D.reels[id]);});}
+function deficit(it){return Math.max(0,rnd((+it.norm||0)-(+it.qty||0)));}
+function itemStatus(qty,it){var n=+it.norm||0;if(n>0&&qty<n)return qty<=0?'out':'low';return 'ok';}
+function curMark(r){return r.markNow==null?(+r.markStart||0):+r.markNow;}
+function reelCalc(r){
+  var s=+r.markStart||0,e=+r.markEnd||0,n=curMark(r);
+  var total=Math.abs(e-s),used=Math.abs(n-s),left=Math.abs(e-n);
+  return {total:total,used:used,left:left,dir:e>=s?1:-1,pct:total>0?Math.max(0,Math.min(1,left/total)):0};
+}
+function reelStatus(r){
+  if(r.closed)return 'closed';
+  var c=reelCalc(r);
+  if(c.left<=0)return 'empty';
+  if(c.used<=0)return 'new';
+  if(c.left<=LOW_M||c.pct<=0.1)return 'low';
+  return 'work';
+}
+function totalLeft(){var s=0;reelsArr().forEach(function(r){if(!r.closed)s+=reelCalc(r).left;});return s;}
+function catList(){
+  var c=(D.cats||[]).slice();
+  itemsArr().forEach(function(i){if(i.cat&&c.indexOf(i.cat)<0)c.push(i.cat);});
+  return c;
+}
+function logAdd(e){
+  e.id=uid();
+  if(e.ts==null)e.ts=Date.now();
+  if(!e.date)e.date=todayKey();
+  D.log.push(e);
+}
+function addrFor(date,job){
+  for(var i=D.log.length-1;i>=0;i--){var e=D.log[i];if(e.date===date&&e.job===job&&e.addr)return e.addr;}
+  return '';
+}
+function dayEntries(k){return D.log.filter(function(e){return e.date===k;}).sort(function(a,b){return a.ts-b.ts;});}
+function sumM(list){var s=0;list.forEach(function(e){if(e.kind==='cable')s+=+e.meters||0;});return rnd(s);}
+
+/* ---------- request text ---------- */
+function qtyText(q,unit){
+  q=fmt(q);
+  if(unit==='шт'||!unit)return q+'шт';
+  if(unit==='уп'){var n=+q;return q+' '+(n===1?'упаковка':(n>1&&n<5?'упаковки':'упаковок'));}
+  return q+' '+unit;
+}
+function reqDate(){return validKey(D.req.date)?D.req.date:todayKey();}
+function reqLines(){
+  var out=[];
+  itemsArr().forEach(function(it){
+    var adj=D.req.adj[it.id],def=deficit(it);
+    if(adj!=null||def>0)out.push({id:it.id,it:it,q:adj!=null?adj:def});
+  });
+  return out;
+}
+function reqText(){
+  var L=['На '+ruDate(reqDate()),'Бригада '+D.brigade];
+  reqLines().forEach(function(l){if(l.q>0)L.push(l.it.name+' - '+qtyText(l.q,l.it.unit));});
+  D.req.extra.forEach(function(t){L.push(t);});
+  return L.join('\n');
+}
+function reqCount(){
+  var n=0;reqLines().forEach(function(l){if(l.q>0)n++;});
+  return n+D.req.extra.length;
+}
+
+/* ---------- toast, copy ---------- */
+function toast(m){var t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){t.hidden=true;},3200);}
+function legacyCopy(t){
+  var ta=document.createElement('textarea');
+  ta.value=t;ta.setAttribute('readonly','');
+  ta.style.cssText='position:fixed;top:0;left:0;opacity:0;';
+  document.body.appendChild(ta);ta.select();ta.setSelectionRange(0,t.length);
+  var ok=false;try{ok=document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+  return ok;
+}
+function copyText(t,okMsg){
+  function manual(){
+    var ta=$('cf');ta.hidden=false;ta.value=t;ta.focus();ta.select();
+    toast('Выделите текст и скопируйте его');
+  }
+  function legacy(){if(legacyCopy(t))toast(okMsg||'Скопировано');else manual();}
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(t).then(function(){toast(okMsg||'Скопировано');},legacy);
+    }else legacy();
+  }catch(e){legacy();}
+}
+
+/* ---------- drawing ---------- */
+function draw(){drawHeader();drawMain();drawDraft();drawNav();drawLists();}
+
+function drawHeader(){
+  var t=todayKey(),es=D.log.filter(function(e){return e.date===t;});
+  var jobs={};es.forEach(function(e){if(e.job>0)jobs[e.job]=1;});
+  var jn=Object.keys(jobs).length;
+  $('h1').textContent='Бригада '+(D.brigade||'');
+  $('today').innerHTML='<b>Сегодня</b> · '+esc(longDate(t));
+  $('stat').innerHTML='<span>нарядов <b>'+jn+'</b></span><span>кабель за день <b>'+fmt(sumM(es))+'</b> м</span><span>на катушках <b>'+fmt(totalLeft())+'</b> м</span>';
+  $('searchbar').hidden=!(U.tab==='stock'&&Object.keys(D.items).length>0);
+  $('histbtn').setAttribute('aria-pressed',U.tab==='hist'?'true':'false');
+}
+function drawNav(){
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(b){
+    if(b.getAttribute('data-v')===U.tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');
+  });
+  var n=reqCount(),bd=$('reqbadge');bd.hidden=!n;bd.textContent=n;
+}
+function drawDraft(){
+  var ks=Object.keys(U.draft),el=$('draft');
+  if(!ks.length){el.hidden=true;return;}
+  var out=0,inn=0;
+  ks.forEach(function(k){var d=U.draft[k];if(d<0)out+=-d;else inn+=d;});
+  $('dsum').textContent='Позиций: '+ks.length+(out?' · расход '+fmt(out):'')+(inn?' · получено '+fmt(inn):'');
+  el.hidden=false;
+}
+function drawLists(){
+  $('dl-cat').innerHTML=catList().map(function(c){return '<option value="'+esc(c)+'">';}).join('');
+  var seen={},addrs=[];
+  for(var i=D.log.length-1;i>=0&&addrs.length<30;i--){var a=D.log[i].addr;if(a&&!seen[a]){seen[a]=1;addrs.push(a);}}
+  $('dl-addr').innerHTML=addrs.map(function(o){return '<option value="'+esc(o)+'">';}).join('');
+  var src={},srcs=[],ty={},tys=TYPES.slice();
+  tys.forEach(function(t){ty[t]=1;});
+  reelsArr().forEach(function(r){
+    [r.source,r.holder].forEach(function(s){if(s&&!src[s]){src[s]=1;srcs.push(s);}});
+    if(r.cableType&&!ty[r.cableType]){ty[r.cableType]=1;tys.push(r.cableType);}
+  });
+  $('dl-src').innerHTML=srcs.map(function(s){return '<option value="'+esc(s)+'">';}).join('');
+  $('dl-type').innerHTML=tys.map(function(s){return '<option value="'+esc(s)+'">';}).join('');
+}
+function banners(){
+  var h='';
+  if(U.tab==='stock'&&D.hint)h+='<div class="note"><span>Список позиций уже заполнен. Откройте позицию, впишите остаток и норму: сколько должно быть в машине. Нехватка попадёт в заявку.</span><button class="btn" type="button" data-act="hintoff">Понятно</button></div>';
+  return h?'<div class="notes">'+h+'</div>':'';
+}
+function drawMain(){
+  var h=banners();
+  if(U.tab==='stock')h+=stockHTML();
+  else if(U.tab==='reels')h+=reelsHTML();
+  else if(U.tab==='req')h+=reqHTML();
+  else h+=histHTML();
+  $('main').innerHTML=h;
+  if(U.tab!=='req'&&U.tab!=='hist')$('cf').hidden=true;
+}
+function chip(act,v,label,pressed){
+  return '<button type="button" class="chip" data-act="'+act+'" data-v="'+esc(v)+'" aria-pressed="'+pressed+'">'+label+'</button>';
+}
+function swatch(it){return it.sw?'<span class="sw" aria-hidden="true"><i class="'+it.sw[0]+'"></i><i class="'+it.sw[1]+'"></i></span>':'';}
+
+/* --- stock --- */
+function rowHTML(it){
+  var d=U.draft[it.id]||0,q=+it.qty||0,after=rnd(q+d);
+  var st=itemStatus(after,it);
+  var cls=st==='out'?'bad':st==='low'?'warn':'';
+  var pill=st==='out'?'<span class="pill bad">Нет</span>':st==='low'?'<span class="pill warn">Мало</span>':'';
+  var norm=+it.norm||0;
+  var meta='<span>'+esc(it.unit||'шт')+(norm>0?' · норма '+fmt(norm):'')+'</span>'+pill+(it.note?'<span>'+esc(it.note)+'</span>':'');
+  var nm=esc(it.name);
+  return '<div class="row"><div><button type="button" class="name" data-act="item" data-id="'+it.id+'">'+swatch(it)+'<span>'+nm+'</span></button><div class="meta">'+meta+'</div></div>'+
+    '<div class="step"><button type="button" class="sbtn" data-act="dec" data-id="'+it.id+'" aria-label="Списать 1: '+nm+'"'+(after<=0?' disabled':'')+'>−</button>'+
+    '<div class="val '+cls+'"><b>'+fmt(after)+'</b>'+(d?'<i>'+(d>0?'+':'−')+fmt(Math.abs(d))+'</i>':'')+'</div>'+
+    '<button type="button" class="sbtn plus" data-act="inc" data-id="'+it.id+'" aria-label="Получил 1: '+nm+'">+</button></div></div>';
+}
+function stockHTML(){
+  var all=itemsArr();
+  if(!all.length){
+    return '<div class="empty"><h2>Позиций нет</h2><p>Добавьте то, что возите в машине.</p><button class="btn primary" type="button" data-act="newitem">Добавить позицию</button></div>';
+  }
+  var cats=catList().filter(function(c){return all.some(function(i){return (i.cat||'Без категории')===c;});});
+  if(all.some(function(i){return !i.cat;}))cats.push('Без категории');
+  var cat=U.cat;
+  if(cat!=='all'&&cat!=='need'&&cats.indexOf(cat)<0)cat='all';
+  var need=all.filter(function(i){return itemStatus(+i.qty||0,i)!=='ok';}).length;
+  var q=U.q.trim().toLowerCase();
+  var list=all.filter(function(i){
+    var c=i.cat||'Без категории';
+    if(cat==='need'&&itemStatus(+i.qty||0,i)==='ok')return false;
+    if(cat!=='all'&&cat!=='need'&&c!==cat)return false;
+    if(q&&(i.name+' '+c+' '+(i.note||'')).toLowerCase().indexOf(q)<0)return false;
+    return true;
+  });
+  var h='<div class="toolrow"><p>Нажимайте − при расходе и + при получении, затем «Записать» внизу.</p><button class="btn primary" type="button" data-act="newitem">+ Позиция</button></div>';
+  h+='<div class="chips">'+chip('cat','all','Все',cat==='all')+chip('cat','need','Мало '+need,cat==='need')+cats.map(function(c){return chip('cat',c,esc(c),cat===c);}).join('')+'</div>';
+  if(!list.length)return h+'<p class="empty">Ничего не найдено.</p>';
+  cats.forEach(function(c){
+    var rows=list.filter(function(i){return (i.cat||'Без категории')===c;});
+    if(!rows.length)return;
+    h+='<section class="group"><h2 class="glabel"><span>'+esc(c)+'</span><span>'+rows.length+'</span></h2><div class="rows">'+rows.map(rowHTML).join('')+'</div></section>';
+  });
+  return h;
+}
+
+/* --- reels --- */
+function reelCard(r){
+  var c=reelCalc(r),st=reelStatus(r),now=curMark(r);
+  var P={closed:['mute','Закрыта'],empty:['bad','Кончилась'],'new':['accent','Новая'],low:['warn','Мало'],work:['ok','В работе']}[st];
+  var from=[r.cableType,r.source?'откуда: '+r.source:'',r.holder?'у: '+r.holder:''].filter(Boolean).map(esc).join(' · ');
+  return '<button type="button" class="reel" data-act="reel" data-id="'+r.id+'">'+
+    '<span class="rtop"><span class="rname">'+esc(r.label)+'</span><span class="pill '+P[0]+'">'+P[1]+'</span><span class="rleft"><i>осталось</i><b>'+fmt(c.left)+' м</b></span></span>'+
+    (from?'<span class="rsrc">'+from+'</span>':'')+
+    '<span class="cable"><span style="width:'+(Math.round(c.pct*1000)/10)+'%"></span></span>'+
+    '<span class="rmarks"><span>метка сейчас <b>'+fmt(now)+'</b> → конец <b>'+fmt(+r.markEnd||0)+'</b></span><span>потрачено <b>'+fmt(c.used)+'</b> из <b>'+fmt(c.total)+'</b> м</span></span></button>';
+}
+function reelsHTML(){
+  var rs=reelsArr();
+  if(!rs.length){
+    return '<div class="empty"><h2>Катушек нет</h2><p>Добавьте катушку: номер, откуда она, метки начала и конца кабеля. Расход записывается по метке на оболочке и попадает в историю с датой и нарядом.</p><button class="btn primary" type="button" data-act="newreel">Добавить катушку</button></div>';
+  }
+  var open=rs.filter(function(r){return !r.closed;}).sort(function(a,b){return cmp(a.label,b.label);});
+  var closed=rs.filter(function(r){return r.closed;}).sort(function(a,b){return cmp(a.label,b.label);});
+  var h='<div class="tophead"><div><div class="big">'+fmt(totalLeft())+' м</div><div class="sub">осталось на '+open.length+' '+plural(open.length,'катушке','катушках','катушках')+'</div></div><button class="btn primary" type="button" data-act="newreel">+ Катушка</button></div>';
+  h+=open.map(reelCard).join('');
+  if(closed.length){
+    h+='<div style="margin-top:16px">'+chip('toggleclosed','x','Закрытые ('+closed.length+')',U.showClosed)+'</div>';
+    if(U.showClosed)h+=closed.map(reelCard).join('');
+  }
+  return h;
+}
+
+/* --- request --- */
+function reqHTML(){
+  var lines=reqLines();
+  var h='<label class="rdate"><span>Заявка на дату</span><input id="rd" type="date" value="'+reqDate()+'"></label>';
+  if(lines.length){
+    h+='<section class="group" style="margin-top:0"><h2 class="glabel"><span>Что получить</span><span>'+lines.filter(function(l){return l.q>0;}).length+'</span></h2><div class="rows">'+lines.map(function(l){
+      var it=l.it;
+      return '<div class="row'+(l.q<=0?' off':'')+'"><div><div class="plain">'+swatch(it)+' '+esc(it.name)+'</div><div class="meta"><span>в машине '+fmt(it.qty)+' · норма '+fmt(it.norm||0)+' '+esc(it.unit||'шт')+'</span></div></div>'+
+        '<div class="step"><button type="button" class="sbtn" data-act="rqdec" data-id="'+it.id+'" aria-label="Меньше: '+esc(it.name)+'"'+(l.q<=0?' disabled':'')+'>−</button>'+
+        '<input class="qin" type="number" inputmode="decimal" min="0" step="any" data-id="'+it.id+'" value="'+l.q+'" aria-label="Количество: '+esc(it.name)+'">'+
+        '<button type="button" class="sbtn plus" data-act="rqinc" data-id="'+it.id+'" aria-label="Больше: '+esc(it.name)+'">+</button></div></div>';
+    }).join('')+'</div></section>';
+  }else if(!D.req.extra.length){
+    h+='<div class="empty"><h2>Всё в норме</h2><p>Нехватка появится здесь сама, когда остаток станет меньше нормы. Норму задают в карточке позиции.</p></div>';
+  }
+  if(D.req.extra.length){
+    h+='<section class="group"><h2 class="glabel"><span>Свои строки</span><span>'+D.req.extra.length+'</span></h2><div class="rows">'+D.req.extra.map(function(t,i){
+      return '<div class="row"><div class="plain">'+esc(t)+'</div><button type="button" class="xbtn" data-act="rmextra" data-v="'+i+'" aria-label="Убрать строку">×</button></div>';
+    }).join('')+'</div></section>';
+  }
+  h+='<div class="addline"><input id="ex" type="text" placeholder="Своя строка, например: Кабель 100 м" aria-label="Своя строка"><button class="btn" type="button" data-act="addextra">Добавить</button></div>';
+  h+='<div class="actions-row"><button class="btn" type="button" data-act="reqpick">+ Позиция из списка</button></div>';
+  h+='<pre class="pre" id="rt">'+esc(reqText())+'</pre>';
+  h+='<div class="actions-row"><button class="btn primary" type="button" data-act="copyreq">Копировать список</button>'+
+    '<button class="btn" type="button" data-act="receive">'+(U.confirm==='recv'?'Точно? Нажмите ещё раз':'Получил по заявке')+'</button></div>';
+  h+='<p class="hint">«Получил по заявке» добавит всё из списка в остатки и запишет это в историю.</p>';
+  return h;
+}
+function pickReq(){
+  var inLines={};reqLines().forEach(function(l){inLines[l.id]=1;});
+  var rest=itemsArr().filter(function(i){return !inLines[i.id];});
+  U.sheet={type:'pick'};
+  var h=head('Добавить в заявку');
+  h+=rest.length?'<div class="rows" style="margin-top:12px">'+rest.map(function(i){
+    return '<button type="button" class="pick" data-act="reqadd" data-id="'+i.id+'">'+swatch(i)+' '+esc(i.name)+' <small>· '+esc(i.cat||'')+'</small></button>';
+  }).join('')+'</div>':'<p class="hint">Все позиции уже в заявке.</p>';
+  showSheet(h);
+}
+function receive(){
+  var lines=reqLines().filter(function(l){return l.q>0;});
+  if(!lines.length){toast('В заявке нет позиций из списка');return;}
+  if(U.confirm!=='recv'){U.confirm='recv';drawMain();return;}
+  var base=Date.now();
+  lines.forEach(function(l,i){
+    var it=D.items[l.id];if(!it)return;
+    var after=rnd((+it.qty||0)+l.q);
+    D.items[l.id].qty=after;
+    logAdd({ts:base+i,kind:'add',job:0,name:it.name,unit:it.unit||'',delta:l.q,after:after,note:'получено по заявке'});
+  });
+  D.req.adj={};D.req.extra=[];D.req.date='';
+  U.confirm='';save();draw();toast('Остатки обновлены');
+}
+
+/* --- history --- */
+function entryText(e){
+  var u=e.unit?' '+e.unit:'';
+  function j(a){return a.filter(Boolean).join(' · ');}
+  switch(e.kind){
+    case 'use':return {t:e.name,d:'−'+fmt(Math.abs(e.delta))+u,c:'',s:'остаток '+fmt(e.after)+u};
+    case 'add':return {t:e.name,d:'+'+fmt(e.delta)+u,c:'in',s:e.note||'получено'};
+    case 'adjust':return {t:e.name,d:(e.delta>=0?'+':'−')+fmt(Math.abs(e.delta))+u,c:e.delta>=0?'in':'',s:'пересчёт: было '+fmt(e.before)+', стало '+fmt(e.after)};
+    case 'cable':return {t:'Кабель '+e.name,d:'−'+fmt(e.meters)+' м',c:'',s:j(['метки '+fmt(e.from)+' → '+fmt(e.to),e.cableType])};
+    case 'reel':return {t:'Новая катушка '+e.name,d:fmt(e.meters)+' м',c:'in',s:j([e.cableType,e.src?'откуда: '+e.src:'','метки '+fmt(e.from)+' → '+fmt(e.to)])};
+    case 'close':return {t:'Катушка '+e.name+' закрыта',d:'',c:'',s:'остаток '+fmt(e.meters)+' м'};
+  }
+  return {t:e.name||'',d:'',c:'',s:''};
+}
+function groupJobs(es){
+  var g={};es.forEach(function(e){var j=e.job||0;(g[j]=g[j]||[]).push(e);});
+  var keys=Object.keys(g).map(Number).sort(function(a,b){return ((a===0)-(b===0))||a-b;});
+  return keys.map(function(k){
+    var list=g[k],addr='';
+    list.forEach(function(e){if(e.addr)addr=e.addr;});
+    return {job:k,list:list,addr:addr};
+  });
+}
+function dayBody(k){
+  var es=dayEntries(k);
+  if(!es.length)return '<p class="empty small">За этот день записей нет.</p>';
+  return groupJobs(es).map(function(g){
+    var m=sumM(g.list);
+    return '<section><h3 class="jhead"><span>'+(g.job?'Наряд '+g.job:'Склад')+(g.addr?' <em>· '+esc(g.addr)+'</em>':'')+'</span>'+(m?'<span class="jm">'+fmt(m)+' м</span>':'')+'</h3><div class="rows">'+
+      g.list.map(function(e){
+        var L=entryText(e);
+        return '<div class="lrow"><span class="lm">'+esc(L.t)+'</span><span class="ld '+L.c+'">'+esc(L.d)+'</span>'+(L.s?'<span class="ls">'+esc(L.s)+'</span>':'')+'</div>';
+      }).join('')+'</div></section>';
+  }).join('');
+}
+function daySummary(k){
+  var es=dayEntries(k),jobs={},uses=0;
+  es.forEach(function(e){if(e.job>0)jobs[e.job]=1;if(e.kind==='use')uses++;});
+  var jn=Object.keys(jobs).length,m=sumM(es),p=[];
+  if(jn)p.push(jn+' '+plural(jn,'наряд','наряда','нарядов'));
+  if(m)p.push('кабель '+fmt(m)+' м');
+  if(uses)p.push('списано позиций: '+uses);
+  return p.length?p.join(' · '):'без нарядов';
+}
+function dayText(k){
+  var es=dayEntries(k),L=[ruDate(k)+' · Бригада '+D.brigade];
+  groupJobs(es).forEach(function(g){
+    L.push('',(g.job?'Наряд '+g.job:'Склад')+(g.addr?' ('+g.addr+')':'')+':');
+    g.list.forEach(function(e){
+      var t=entryText(e);
+      L.push('• '+t.t+(t.d?' '+t.d:'')+(e.kind==='cable'?' ('+t.s+')':''));
+    });
+  });
+  return L.join('\n');
+}
+function histHTML(){
+  var t=todayKey(),days={};
+  D.log.forEach(function(e){if(e.date&&e.date!==t)days[e.date]=1;});
+  var keys=Object.keys(days).sort().reverse();
+  var h='<div class="dtitle"><h2>Сегодня</h2><span>'+esc(longDate(t))+'</span></div>';
+  h+='<div class="sub" style="margin:0 2px 4px">'+esc(daySummary(t))+'</div>';
+  h+=dayBody(t);
+  if(dayEntries(t).length)h+='<div class="actions-row"><button class="btn" type="button" data-act="copyday" data-v="'+t+'">Копировать отчёт за сегодня</button></div>';
+  h+='<div class="group"><h2 class="glabel"><span>Прошлые дни</span><span>'+keys.length+'</span></h2>';
+  h+='<label class="rdate" style="margin-bottom:0"><span>Открыть дату</span><input id="hd" type="date" max="'+t+'" value="'+(U.openDay&&validKey(U.openDay)?U.openDay:'')+'"></label>';
+  var shown=keys.slice();
+  if(U.openDay&&U.openDay!==t&&shown.indexOf(U.openDay)<0)shown.unshift(U.openDay);
+  if(!shown.length)h+='<p class="empty small">Прошлых записей пока нет.</p>';
+  shown.forEach(function(k){
+    var open=U.openDay===k;
+    h+='<button type="button" class="dayhead" data-act="day" data-v="'+k+'" aria-expanded="'+open+'"><b>'+esc(dayLabel(k))+(dayLabel(k)==='Вчера'?' · '+esc(longDate(k)):'')+'</b><span class="chev">'+(open?'−':'+')+'</span><span class="s">'+esc(daySummary(k))+'</span></button>';
+    if(open){
+      h+='<div class="daybox">'+dayBody(k)+(dayEntries(k).length?'<div class="actions-row"><button class="btn" type="button" data-act="copyday" data-v="'+k+'">Копировать отчёт</button></div>':'')+'</div>';
+    }
+  });
+  h+='</div>';
+  return h;
+}
+
+/* ---------- sheets ---------- */
+function showSheet(html){
+  $('panel').innerHTML=html;$('scrim').hidden=false;
+  document.documentElement.style.overflow='hidden';
+  $('panel').scrollTop=0;
+  try{if(tg&&tg.BackButton)tg.BackButton.show();}catch(e){}
+}
+function closeSheet(){
+  U.sheet=null;U.confirm='';$('scrim').hidden=true;document.documentElement.style.overflow='';
+  try{if(tg&&tg.BackButton)tg.BackButton.hide();}catch(e){}
+}
+function head(title){return '<div class="sh-head"><h2 id="sh-title">'+esc(title)+'</h2><button class="x" type="button" data-act="close" aria-label="Закрыть">×</button></div>';}
+function fld(id,label,v,o){
+  o=o||{};
+  return '<label class="f"><span>'+label+'</span><input id="'+id+'" type="'+(o.type||'text')+'" '+(o.type==='number'?'inputmode="decimal" step="any" min="0" ':'')+(o.list?'list="'+o.list+'" ':'')+(o.ph?'placeholder="'+esc(o.ph)+'" ':'')+'autocomplete="off" value="'+esc(v==null?'':v)+'">'+(o.hint?'<small>'+o.hint+'</small>':'')+'</label>';
+}
+function jobChips(){
+  return '<div class="chips" role="group" aria-label="Номер наряда">'+[1,2,3,4,5,6].map(function(n){
+    return '<button type="button" class="chip jobchip" data-act="job" data-v="'+n+'" aria-pressed="'+(U.job===n)+'">Наряд '+n+'</button>';
+  }).join('')+'</div>';
+}
+function setJob(n){
+  U.job=n;save();
+  Array.prototype.forEach.call(document.querySelectorAll('.jobchip'),function(b){
+    b.setAttribute('aria-pressed',String(+b.getAttribute('data-v')===n));
+  });
+  var d=$('dobj');if(d&&!$('draft').hidden)d.value=addrFor(todayKey(),n);
+  var u=$('u-obj');if(u){var dt=$('u-date');u.value=addrFor(dt&&validKey(dt.value)?dt.value:todayKey(),n);}
+}
+
+/* --- item --- */
+function openItem(id){
+  var it=id?D.items[id]:null;
+  if(id&&!it)return;
+  U.sheet={type:'item',id:id||null};U.confirm='';
+  var h=head(it?it.name:'Новая позиция');
+  if(it){
+    h+='<div class="quick"><div class="qlbl">Списать или получить</div><div class="qrow"><input id="qn" type="number" inputmode="decimal" step="any" min="0" placeholder="Сколько" aria-label="Количество"><button class="btn" type="button" data-act="qout">Списать</button><button class="btn" type="button" data-act="qin">Получил</button></div><small class="hint">Попадёт в черновик. Запись появится после кнопки «Записать» внизу.</small></div>';
+  }
+  h+='<div class="fsec">'+(it?'<div class="qlbl">Данные позиции</div>':'')+
+    fld('f-name','Название',it&&it.name,{ph:'Например, Сплиттер 1/8'})+
+    '<div class="grid2">'+fld('f-unit','Единица',it?it.unit:'шт',{list:'dl-unit'})+fld('f-cat','Категория',it&&it.cat,{list:'dl-cat'})+'</div>'+
+    '<div class="grid2">'+fld('f-qty','Остаток сейчас',it?it.qty:0,{type:'number'})+fld('f-norm','Норма в машине',it&&it.norm?it.norm:'',{type:'number',hint:'Сколько должно быть. Пусто — не следить'})+'</div>'+
+    fld('f-note','Заметка',it&&it.note,{ph:'Модель, где лежит, комментарий'})+'</div>';
+  h+='<div class="actions"><button class="btn primary" type="button" data-act="saveitem">Сохранить</button><button class="btn" type="button" data-act="close">Отмена</button></div>';
+  if(it)h+='<button class="btn danger wide" type="button" data-act="delitem" id="delbtn">Удалить позицию</button>';
+  showSheet(h);
+}
+function setDraft(id,d){
+  d=rnd(d);
+  if(d===0)delete U.draft[id];else U.draft[id]=d;
+  drawMain();drawDraft();
+}
+function bump(id,by){
+  var it=D.items[id];if(!it)return;
+  var d=(U.draft[id]||0)+by;
+  if((+it.qty||0)+d<0)return;
+  var first=!Object.keys(U.draft).length;
+  setDraft(id,d);
+  if(first){var o=$('dobj');if(o)o.value=addrFor(todayKey(),U.job);}
+}
+function quick(sign){
+  var id=U.sheet&&U.sheet.id,it=D.items[id];if(!it)return;
+  var n=num($('qn').value);
+  if(n==null||n<=0){toast('Введите количество');return;}
+  var d=(U.draft[id]||0)+sign*n;
+  if((+it.qty||0)+d<0){toast('В машине меньше: '+fmt(it.qty)+' '+(it.unit||''));return;}
+  var first=!Object.keys(U.draft).length;
+  closeSheet();setDraft(id,d);
+  if(first){var o=$('dobj');if(o)o.value=addrFor(todayKey(),U.job);}
+  toast((sign<0?'Расход':'Получение')+' добавлен в черновик');
+}
+function saveItem(){
+  var id=U.sheet&&U.sheet.id,old=id?D.items[id]:null;
+  var name=val('f-name');
+  if(!name){toast('Введите название');$('f-name').focus();return;}
+  var qty=num(val('f-qty'));if(qty==null||qty<0)qty=0;
+  var norm=num(val('f-norm'));if(norm==null||norm<0)norm=0;
+  var cat=val('f-cat');
+  if(cat&&D.cats.indexOf(cat)<0)D.cats.push(cat);
+  var data={name:name,unit:val('f-unit')||'шт',cat:cat,qty:qty,norm:norm,note:val('f-note')};
+  if(old){
+    D.items[id]=Object.assign({},old,data);
+    if(rnd(qty)!==rnd(+old.qty||0)){
+      logAdd({kind:'adjust',job:0,name:name,unit:data.unit,delta:rnd(qty-(+old.qty||0)),before:+old.qty||0,after:qty});
+    }
+  }else{
+    id=uid();
+    var mx=0;Object.keys(D.items).forEach(function(k){mx=Math.max(mx,D.items[k].o||0);});
+    data.o=mx+1;D.items[id]=data;
+    if(qty>0)logAdd({kind:'add',job:0,name:name,unit:data.unit,delta:qty,after:qty,note:'новая позиция'});
+  }
+  save();closeSheet();draw();toast('Сохранено');
+}
+function delItem(){
+  var id=U.sheet&&U.sheet.id;if(!id)return;
+  if(U.confirm!=='del'){U.confirm='del';$('delbtn').textContent='Точно удалить? Нажмите ещё раз';return;}
+  delete D.items[id];delete U.draft[id];delete D.req.adj[id];
+  save();closeSheet();draw();toast('Позиция удалена');
+}
+function commit(){
+  var ks=Object.keys(U.draft);if(!ks.length)return;
+  var addr=val('dobj'),base=Date.now(),n=0,job=U.job;
+  ks.forEach(function(id,i){
+    var it=D.items[id];if(!it)return;
+    var d=U.draft[id],after=Math.max(0,rnd((+it.qty||0)+d));
+    if(d<0)logAdd({ts:base+i,kind:'use',job:job,addr:addr,name:it.name,unit:it.unit||'',delta:d,after:after});
+    else logAdd({ts:base+i,kind:'add',job:0,name:it.name,unit:it.unit||'',delta:d,after:after,note:'получено'});
+    D.items[id].qty=after;n++;
+  });
+  U.draft={};$('dobj').value='';
+  save();draw();toast('Записано: '+n+' · наряд '+job);
+}
+
+/* --- reel sheets --- */
+function openReel(id){
+  var r=D.reels[id];if(!r)return;
+  var c=reelCalc(r),now=curMark(r),closed=!!r.closed;
+  U.sheet={type:'reel',id:id};U.confirm='';
+  var from=[r.cableType,r.source?'откуда: '+r.source:'',r.holder?'у: '+r.holder:''].filter(Boolean).map(esc).join(' · ');
+  var h=head('Катушка '+r.label);
+  h+=(from?'<p class="hint" style="margin-top:8px">'+from+'</p>':'');
+  h+='<div class="rsum"><div><i>осталось</i><b>'+fmt(c.left)+' м</b></div><div><i>потрачено</i><b>'+fmt(c.used)+' м</b></div><div><i>метка сейчас</i><b>'+fmt(now)+'</b></div></div>';
+  h+='<span class="cable"><span style="width:'+(Math.round(c.pct*1000)/10)+'%"></span></span>';
+  h+='<p class="hint">Метки '+(c.dir<0?'убывают':'растут')+': от '+fmt(+r.markStart||0)+' к '+fmt(+r.markEnd||0)+'.'+(r.note?' '+esc(r.note):'')+'</p>';
+  if(closed){
+    h+='<div class="actions"><button class="btn primary" type="button" data-act="reelreopen">Вернуть в работу</button><button class="btn" type="button" data-act="reeledit">Править</button></div>';
+  }else{
+    var dflt=addrFor(todayKey(),U.job);
+    h+=fld('u-mark','Метка после работы',null,{type:'number',ph:String(now)})+
+       fld('u-m','Или потрачено, м',null,{type:'number'})+
+       '<p class="hint" id="u-hint"></p>'+
+       jobChips()+
+       fld('u-obj','Адрес наряда',dflt,{list:'dl-addr'})+
+       fld('u-date','Дата',todayKey(),{type:'date'});
+    h+='<div class="actions"><button class="btn primary" type="button" data-act="reeluse">Записать расход</button></div>';
+    h+='<div class="actions"><button class="btn" type="button" data-act="reelclose">Закрыть катушку</button><button class="btn" type="button" data-act="reeledit">Править</button></div>';
+  }
+  var hist=D.log.filter(function(e){return e.rid===id;}).sort(function(a,b){return b.ts-a.ts;}).slice(0,25);
+  h+='<div class="fsec"><div class="qlbl">История катушки</div>';
+  if(hist.length){
+    h+='<div class="rows" style="margin-top:8px">'+hist.map(function(e){
+      var L=entryText(e);
+      var who=e.job?('Наряд '+e.job+(e.addr?' · '+e.addr:'')):'';
+      return '<div class="lrow"><span class="lm">'+esc(shortDate(e.date))+(who?' · '+esc(who):'')+'</span><span class="ld '+L.c+'">'+esc(L.d)+'</span><span class="ls">'+esc(e.kind==='cable'?L.s:L.t)+'</span></div>';
+    }).join('')+'</div>';
+  }else h+='<p class="hint">Записей пока нет.</p>';
+  h+='</div>';
+  showSheet(h);
+}
+function checkUse(){
+  var r=D.reels[U.sheet&&U.sheet.id];if(!r)return null;
+  var c=reelCalc(r),now=curMark(r),end=+r.markEnd||0;
+  var m=num($('u-mark').value),hint=$('u-hint');
+  if(m==null){hint.className='hint';hint.textContent='';return null;}
+  var inRange=(m-now)*c.dir>=0&&(end-m)*c.dir>=0;
+  if(!inRange){hint.className='hint err';hint.textContent='Метка вне катушки. Допустимо от '+fmt(now)+' до '+fmt(end)+'.';return null;}
+  var used=rnd(Math.abs(m-now));
+  hint.className='hint good';hint.textContent='Потрачено '+fmt(used)+' м, останется '+fmt(Math.abs(end-m))+' м.';
+  return {mark:m,used:used,left:rnd(Math.abs(end-m))};
+}
+function syncUse(from){
+  var r=D.reels[U.sheet&&U.sheet.id];if(!r)return;
+  var c=reelCalc(r),now=curMark(r);
+  if(from==='u-mark'){var m=num($('u-mark').value);$('u-m').value=m==null?'':String(rnd(Math.abs(m-now)));}
+  else{var d=num($('u-m').value);$('u-mark').value=d==null?'':String(rnd(now+c.dir*d));}
+  checkUse();
+}
+function reelUse(){
+  var id=U.sheet&&U.sheet.id,r=D.reels[id];if(!r)return;
+  var res=checkUse();
+  if(!res){toast('Введите метку или метры в пределах катушки');return;}
+  if(res.used<=0){toast('Расход 0 м, записывать нечего');return;}
+  var date=val('u-date');if(!validKey(date))date=todayKey();
+  var now=curMark(r);
+  logAdd({kind:'cable',date:date,job:U.job,addr:val('u-obj'),rid:id,name:r.label,cableType:r.cableType||'',from:now,to:res.mark,meters:res.used,after:res.left});
+  D.reels[id]=Object.assign({},r,{markNow:res.mark});
+  save();closeSheet();draw();toast('Записано: '+fmt(res.used)+' м · наряд '+U.job);
+}
+function reelClose(){
+  var id=U.sheet&&U.sheet.id,r=D.reels[id];if(!r)return;
+  logAdd({kind:'close',job:0,rid:id,name:r.label,meters:reelCalc(r).left});
+  D.reels[id]=Object.assign({},r,{closed:true});
+  save();closeSheet();draw();toast('Катушка закрыта');
+}
+function reelReopen(){
+  var id=U.sheet&&U.sheet.id,r=D.reels[id];if(!r)return;
+  D.reels[id]=Object.assign({},r,{closed:false});
+  save();closeSheet();draw();toast('Катушка в работе');
+}
+function openReelEdit(id){
+  var r=id?D.reels[id]:null;
+  if(id&&!r)return;
+  U.sheet={type:'reeledit',id:id||null};U.confirm='';
+  var h=head(r?'Правка катушки':'Новая катушка');
+  h+=fld('r-label','Номер катушки',r&&r.label,{ph:'Например, К-07'})+
+     fld('r-type','Тип кабеля',r&&r.cableType,{list:'dl-type'})+
+     '<div class="grid2">'+fld('r-src','Откуда',r&&r.source,{list:'dl-src',ph:'Склад, накладная'})+fld('r-hold','У кого или где',r&&r.holder,{list:'dl-src',ph:'Машина, склад'})+'</div>'+
+     '<div class="grid2">'+fld('r-start','Начальная метка, м',r?r.markStart:'',{type:'number'})+fld('r-end','Конечная метка, м',r?r.markEnd:'',{type:'number'})+'</div>'+
+     fld('r-now','Метка сейчас',r?curMark(r):'',{type:'number',hint:'Пусто — катушка новая, метка равна начальной'})+
+     fld('r-note','Заметка',r&&r.note,{ph:'Комментарий'});
+  h+='<p class="hint">Метки напечатаны на оболочке кабеля. Если они убывают, начальная метка больше конечной.</p>';
+  h+='<div class="actions"><button class="btn primary" type="button" data-act="savereel">Сохранить</button><button class="btn" type="button" data-act="close">Отмена</button></div>';
+  if(r)h+='<button class="btn danger wide" type="button" data-act="delreel" id="delbtn">Удалить катушку</button>';
+  showSheet(h);
+}
+function saveReel(){
+  var id=U.sheet&&U.sheet.id,old=id?D.reels[id]:null;
+  var label=val('r-label'),s=num(val('r-start')),e=num(val('r-end'));
+  if(!label){toast('Укажите номер катушки');$('r-label').focus();return;}
+  if(s==null||e==null||s===e){toast('Укажите начальную и конечную метки');return;}
+  var nn=num(val('r-now')),now=nn==null?s:nn,dir=e>s?1:-1;
+  if((now-s)*dir<0||(e-now)*dir<0){toast('Метка сейчас должна быть между начальной и конечной');return;}
+  var data={label:label,cableType:val('r-type'),source:val('r-src'),holder:val('r-hold'),markStart:s,markEnd:e,markNow:now,note:val('r-note'),closed:old?!!old.closed:false};
+  if(old){D.reels[id]=Object.assign({},old,data);}
+  else{
+    id=uid();D.reels[id]=data;
+    logAdd({kind:'reel',job:0,rid:id,name:label,cableType:data.cableType,src:data.source,from:s,to:e,meters:Math.abs(e-s)});
+  }
+  save();closeSheet();draw();toast('Сохранено');
+}
+function delReel(){
+  var id=U.sheet&&U.sheet.id;if(!id)return;
+  if(U.confirm!=='delreel'){U.confirm='delreel';$('delbtn').textContent='Точно удалить? Нажмите ещё раз';return;}
+  delete D.reels[id];
+  save();closeSheet();draw();toast('Катушка удалена');
+}
+
+/* --- settings --- */
+function openSettings(){
+  U.sheet={type:'settings'};U.confirm='';
+  var h=head('Настройки');
+  h+=fld('s-br','Номер бригады',D.brigade,{ph:'7'});
+  h+='<div class="actions"><button class="btn primary" type="button" data-act="savesettings">Сохранить</button></div>';
+  h+='<div class="fsec"><div class="qlbl">Резервная копия</div><p class="hint">Данные хранятся в этом телефоне. Раз в неделю копируйте их и отправляйте себе в «Избранное» Telegram.</p>'+
+     '<button class="btn wide" type="button" data-act="copybackup">Копировать резервную копию</button>'+
+     '<label class="f"><span>Восстановить из копии</span><textarea id="rs" rows="3" placeholder="Вставьте сюда скопированный текст"></textarea></label>'+
+     '<button class="btn wide" type="button" data-act="restore" id="restbtn">Восстановить</button></div>';
+  h+='<div class="fsec"><button class="btn danger wide" type="button" data-act="resetall" id="resetbtn">Стереть всё и начать заново</button></div>';
+  showSheet(h);
+}
+function restore(){
+  var t=val('rs');
+  if(!t){toast('Вставьте текст копии');return;}
+  var o;
+  try{o=JSON.parse(t);}catch(e){o=null;}
+  if(!o||typeof o!=='object'||!o.items||!o.reels||!Array.isArray(o.log)){toast('Это не похоже на копию склада');return;}
+  if(U.confirm!=='rest'){U.confirm='rest';$('restbtn').textContent='Заменить текущие данные? Нажмите ещё раз';return;}
+  o.req=o.req||{date:'',adj:{},extra:[]};o.req.adj=o.req.adj||{};o.req.extra=o.req.extra||[];o.cats=o.cats||[];
+  D=o;U.draft={};U.job=D.job||1;save();closeSheet();draw();toast('Данные восстановлены');
+}
+function resetAll(){
+  if(U.confirm!=='reset'){U.confirm='reset';$('resetbtn').textContent='Точно стереть? Нажмите ещё раз';return;}
+  D=seed();U.draft={};U.job=1;U.openDay=null;save();closeSheet();draw();toast('Начато заново');
+}
+
+/* ---------- events ---------- */
+function act(a,t){
+  var id=t.getAttribute('data-id'),v=t.getAttribute('data-v');
+  switch(a){
+    case 'tab':U.tab=v;U.confirm='';closeSheet();draw();window.scrollTo(0,0);break;
+    case 'cat':U.cat=v;drawMain();break;
+    case 'toggleclosed':U.showClosed=!U.showClosed;drawMain();break;
+    case 'hintoff':D.hint=false;save();drawMain();break;
+    case 'dec':bump(id,-1);break;
+    case 'inc':bump(id,1);break;
+    case 'item':openItem(id);break;
+    case 'newitem':openItem(null);break;
+    case 'dreset':U.draft={};$('dobj').value='';drawMain();drawDraft();break;
+    case 'dcommit':commit();break;
+    case 'job':setJob(+v);break;
+    case 'qout':quick(-1);break;
+    case 'qin':quick(1);break;
+    case 'saveitem':saveItem();break;
+    case 'delitem':delItem();break;
+    case 'close':closeSheet();break;
+    case 'reel':openReel(id);break;
+    case 'newreel':openReelEdit(null);break;
+    case 'reeledit':openReelEdit(U.sheet&&U.sheet.id);break;
+    case 'reeluse':reelUse();break;
+    case 'reelclose':reelClose();break;
+    case 'reelreopen':reelReopen();break;
+    case 'savereel':saveReel();break;
+    case 'delreel':delReel();break;
+    case 'rqdec':case 'rqinc':{
+      var l=reqLines().filter(function(x){return x.id===id;})[0];
+      if(l){D.req.adj[id]=Math.max(0,rnd(l.q+(a==='rqinc'?1:-1)));save();drawMain();drawNav();}
+      break;}
+    case 'addextra':{
+      var inp=$('ex'),tx=inp?inp.value.trim():'';
+      if(!tx){toast('Введите строку');break;}
+      D.req.extra.push(tx);save();drawMain();drawNav();break;}
+    case 'rmextra':D.req.extra.splice(+v,1);save();drawMain();drawNav();break;
+    case 'reqpick':pickReq();break;
+    case 'reqadd':D.req.adj[id]=1;save();closeSheet();drawMain();drawNav();break;
+    case 'copyreq':copyText(reqText(),'Список скопирован');break;
+    case 'receive':receive();break;
+    case 'day':U.openDay=(U.openDay===v)?null:v;drawMain();break;
+    case 'copyday':copyText(dayText(v),'Отчёт скопирован');break;
+    case 'settings':openSettings();break;
+    case 'savesettings':D.brigade=val('s-br')||D.brigade;save();closeSheet();draw();toast('Сохранено');break;
+    case 'copybackup':copyText(JSON.stringify(D),'Копия скопирована');break;
+    case 'restore':restore();break;
+    case 'resetall':resetAll();break;
+  }
+}
+document.addEventListener('click',function(e){
+  var t=e.target.closest?e.target.closest('[data-act]'):null;
+  if(t)act(t.getAttribute('data-act'),t);
+});
+$('scrim').addEventListener('click',function(e){if(e.target===this)closeSheet();});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&U.sheet)closeSheet();});
+document.addEventListener('input',function(e){
+  var id=e.target.id;
+  if(id==='u-mark'||id==='u-m')syncUse(id);
+  else if(id==='q'){U.q=e.target.value;drawMain();}
+});
+document.addEventListener('change',function(e){
+  var t=e.target,id=t.id;
+  if(t.classList&&t.classList.contains('qin')){
+    var n=num(t.value);if(n==null||n<0)n=0;
+    D.req.adj[t.getAttribute('data-id')]=rnd(n);save();drawMain();drawNav();
+  }else if(id==='rd'){D.req.date=validKey(t.value)?t.value:'';save();drawMain();}
+  else if(id==='hd'){U.openDay=validKey(t.value)?t.value:null;drawMain();}
+  else if(id==='u-date'){var u=$('u-obj');if(u&&validKey(t.value))u.value=addrFor(t.value,U.job);}
+});
+document.addEventListener('visibilitychange',function(){if(!document.hidden)draw();});
+
+/* ---------- start ---------- */
+try{
+  if(tg){
+    tg.ready();tg.expand();
+    if(tg.disableVerticalSwipes)tg.disableVerticalSwipes();
+    if(tg.colorScheme)document.documentElement.setAttribute('data-theme',tg.colorScheme==='dark'?'dark':'light');
+    if(tg.BackButton)tg.BackButton.onClick(closeSheet);
+  }
+}catch(e){}
+$('djobs').innerHTML=jobChips();
+draw();
+try{
+  if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(function(){});
+}catch(e){}
+})();
+</script>
+</body>
+</html>
